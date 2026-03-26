@@ -40,3 +40,53 @@
 .read-the-docs {
   color: #888;
 }
+/* 1. Force Landscape (Moved outside for better browser support) */
+@page {
+  size: landscape;
+  margin: 10mm;
+}
+
+/* --- THE NUCLEAR PDF EXPORT OVERRIDE --- */
+@media print {
+  /* 2. DESTROY ALL DASHBOARD SCREEN LOCKS & SHRINK TO FIT */
+  html, body, #root, main, div {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+    position: static !important;
+    zoom: 0.8; /* Shrinks the whole page to 80% so it fits! */
+  }
+
+  /* 3. Hide the Sidebar, Navigation, and Buttons */
+  aside, nav, header, button {
+    display: none !important;
+  }
+
+  /* 4. Force the main dashboard area to take up the whole paper */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 5. Force the table to stretch correctly */
+  table {
+    width: 100% !important;
+    table-layout: fixed !important; 
+  }
+
+  /* 6. Force Chrome/Edge to print your background colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Optional: Remove the card shadow so it looks like a clean document */
+  .glass-card {
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+}

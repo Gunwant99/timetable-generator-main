@@ -1,109 +1,170 @@
-import { AppLayout } from '@/components/AppLayout';
+import React, { useState } from 'react';
+import { AppSidebar } from '@/components/AppSidebar';
 import { useTimetableStore } from '@/store/timetableStore';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import type { Room } from '@/types/timetable';
+import { Plus, DoorOpen, Trash2 } from 'lucide-react';
 
-const RoomsPage = () => {
-  const { rooms, addRoom, removeRoom } = useTimetableStore();
-  const [open, setOpen] = useState(false);
-  const [roomNumber, setRoomNumber] = useState('');
-  const [capacity, setCapacity] = useState('60');
-  const [type, setType] = useState<'Classroom' | 'Lab'>('Classroom');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function RoomsPage() {
+  const { rooms, addRoom, deleteRoom } = useTimetableStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [newRoom, setNewRoom] = useState({
+    roomNumber: '',
+    capacity: 60,
+    type: 'Classroom'
+  });
 
-  const handleAdd = async () => {
-    if (!roomNumber) {
-      toast.error("Room Number is required");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const newRoom: Room = {
-      id: `r${Date.now()}`,
-      roomNumber, 
-      capacity: parseInt(capacity) || 60, 
-      type,
-      building: 'Main' // Adding a default value since it's in your model
-    };
-
-    try {
-      await addRoom(newRoom);
-      toast.success("Room added successfully!");
-      setRoomNumber(''); 
-      setCapacity('60'); 
-      setType('Classroom');
-      setOpen(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to add room to the database.");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addRoom({
+      ...newRoom,
+      id: Math.random().toString(36).substring(7),
+    });
+    setIsModalOpen(false);
+    setNewRoom({ roomNumber: '', capacity: 60, type: 'Classroom' });
   };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">Rooms & Labs</h1>
-            <p className="text-sm text-muted-foreground">Manage available spaces</p>
-          </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-accent text-accent-foreground border-0"><Plus className="mr-2 h-4 w-4" />Add Room</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle className="font-display">Add Room</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div><Label>Room Number</Label><Input value={roomNumber} onChange={e => setRoomNumber(e.target.value)} placeholder="CR-104" /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div><Label>Capacity</Label><Input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} /></div>
-                  <div>
-                    <Label>Type</Label>
-                    <Select value={type} onValueChange={(v) => setType(v as 'Classroom' | 'Lab')}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Classroom">Classroom</SelectItem>
-                        <SelectItem value="Lab">Lab</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button onClick={handleAdd} disabled={isSubmitting} className="w-full gradient-accent text-accent-foreground border-0">
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Add Room'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rooms.map((r) => (
-            <div key={r.id} className="glass-card rounded-xl p-4 animate-fade-in">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-foreground">{r.roomNumber}</p>
-                  <p className="text-xs text-muted-foreground">Cap: {r.capacity} · {r.type}</p>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => removeRoom(r.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+    <div className="flex min-h-screen bg-slate-50">
+      <AppSidebar />
+      
+      <main className="flex-1 ml-64 p-8">
+        <div className="max-w-5xl mx-auto space-y-6">
+          
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Facility Management</h2>
+              <p className="text-slate-500 mt-1">Global registry of all classrooms and laboratories</p>
             </div>
-          ))}
-        </div>
-      </div>
-    </AppLayout>
-  );
-};
+            
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all"
+            >
+              <Plus size={20} /> Add Room
+            </button>
+          </div>
 
-export default RoomsPage;
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <p className="text-xs font-bold text-slate-400 uppercase">Total Facilities</p>
+              <p className="text-2xl font-black text-slate-800">{rooms.length}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <p className="text-xs font-bold text-blue-400 uppercase">Classrooms</p>
+              <p className="text-2xl font-black text-blue-800">
+                {rooms.filter(r => r.type.toLowerCase() === 'classroom').length}
+              </p>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <p className="text-xs font-bold text-amber-500 uppercase">Laboratories</p>
+              <p className="text-2xl font-black text-amber-800">
+                {rooms.filter(r => r.type.toLowerCase() === 'lab').length}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  <th className="px-6 py-4">Room Number</th>
+                  <th className="px-6 py-4">Type</th>
+                  <th className="px-6 py-4">Capacity</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rooms.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium">
+                      No rooms added yet.
+                    </td>
+                  </tr>
+                ) : (
+                  rooms.map((room) => (
+                    <tr key={room.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-slate-900 text-lg uppercase">
+                        {room.roomNumber}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
+                          room.type.toLowerCase() === 'lab' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {room.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-slate-600">
+                        {room.capacity} seats
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => deleteRoom(room.id)} className="text-rose-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors">
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      {/* ADD ROOM MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <DoorOpen className="text-emerald-500" /> Add Facility
+            </h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Room Identifier</label>
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="e.g. CR-01 or Lab-3" 
+                  className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500 uppercase font-medium"
+                  value={newRoom.roomNumber} 
+                  onChange={e => setNewRoom({...newRoom, roomNumber: e.target.value.toUpperCase()})} 
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Facility Type</label>
+                  <select 
+                    className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500 font-medium"
+                    value={newRoom.type} 
+                    onChange={e => setNewRoom({...newRoom, type: e.target.value})}
+                  >
+                    <option value="Classroom">Classroom</option>
+                    <option value="Lab">Laboratory</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Capacity</label>
+                  <input 
+                    required 
+                    type="number" 
+                    min="10" 
+                    max="150" 
+                    className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500 font-medium"
+                    value={newRoom.capacity} 
+                    onChange={e => setNewRoom({...newRoom, capacity: parseInt(e.target.value)})} 
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 transition-colors">Save Room</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

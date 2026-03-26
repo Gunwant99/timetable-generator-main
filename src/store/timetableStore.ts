@@ -12,14 +12,24 @@ interface TimetableStore {
   selectedSemester: number;
 
   fetchInitialData: () => Promise<void>;
+  
+  // Faculty Actions
   addFaculty: (f: Faculty) => Promise<void>;
-  removeFaculty: (id: string) => Promise<void>;
+  updateFaculty: (id: string, updatedData: Partial<Faculty>) => Promise<void>;
+  deleteFaculty: (id: string) => Promise<void>;
+  
+  // Subject Actions
   addSubject: (s: Subject) => Promise<void>;
-  removeSubject: (id: string) => Promise<void>;
+  updateSubject: (id: string, updatedData: Partial<Subject>) => Promise<void>; // NEW!
+  deleteSubject: (id: string) => Promise<void>;
+  
+  // Class & Room Actions
   addClass: (c: ClassSection) => Promise<void>;
-  removeClass: (id: string) => Promise<void>;
+  deleteClass: (id: string) => Promise<void>;
   addRoom: (r: Room) => Promise<void>;
-  removeRoom: (id: string) => Promise<void>;
+  deleteRoom: (id: string) => Promise<void>;
+  
+  // Timetable Actions
   setTimetableEntries: (entries: TimetableEntry[]) => void;
   setIsGenerated: (v: boolean) => void;
   setSelectedClass: (id: string | null) => void;
@@ -40,7 +50,6 @@ export const useTimetableStore = create<TimetableStore>((set) => ({
   selectedSemester: 3,
 
   fetchInitialData: async () => {
-    // Ultra-safe fetching: if one fails, the others still load!
     try {
       const fetchSafe = async (endpoint: string) => {
         try {
@@ -72,6 +81,7 @@ export const useTimetableStore = create<TimetableStore>((set) => ({
     }
   },
 
+  // --- FACULTY ---
   addFaculty: async (f) => {
     try {
       const res = await fetch(`${API_BASE}/faculty`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f) });
@@ -79,24 +89,56 @@ export const useTimetableStore = create<TimetableStore>((set) => ({
       else alert("Backend Error: Database format mismatch.");
     } catch (e: any) { alert("Network Error"); }
   },
+
+  updateFaculty: async (id, updatedData) => {
+    try {
+      const res = await fetch(`${API_BASE}/faculty/${id}`, { 
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(updatedData) 
+      });
+      if (res.ok) {
+        set((state) => ({ faculty: state.faculty.map(f => f.id === id ? { ...f, ...updatedData } : f) }));
+      } else alert("Failed to update faculty in database.");
+    } catch (e: any) { console.error("Error updating faculty:", e); }
+  },
   
-  removeFaculty: async (id) => {
-    await fetch(`${API_BASE}/faculty/${id}`, { method: 'DELETE' });
-    set((s) => ({ faculty: s.faculty.filter(f => f.id !== id) }));
+  deleteFaculty: async (id) => {
+    try {
+      await fetch(`${API_BASE}/faculty/${id}`, { method: 'DELETE' });
+      set((s) => ({ faculty: s.faculty.filter(f => f.id !== id) }));
+    } catch (e: any) { console.error("Error deleting faculty"); }
   },
 
+  // --- SUBJECTS ---
   addSubject: async (sub) => {
     try {
       const res = await fetch(`${API_BASE}/subjects`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
       if (res.ok) set((s) => ({ subjects: [...s.subjects, sub] }));
     } catch (e: any) { alert("Network Error"); }
   },
+
+  updateSubject: async (id, updatedData) => {
+    try {
+      const res = await fetch(`${API_BASE}/subjects/${id}`, { 
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(updatedData) 
+      });
+      if (res.ok) {
+        set((state) => ({ subjects: state.subjects.map(s => s.id === id ? { ...s, ...updatedData } : s) }));
+      } else alert("Failed to update subject in database.");
+    } catch (e: any) { console.error("Error updating subject:", e); }
+  },
   
-  removeSubject: async (id) => {
-    await fetch(`${API_BASE}/subjects/${id}`, { method: 'DELETE' });
-    set((s) => ({ subjects: s.subjects.filter(sub => sub.id !== id) }));
+  deleteSubject: async (id) => {
+    try {
+      await fetch(`${API_BASE}/subjects/${id}`, { method: 'DELETE' });
+      set((s) => ({ subjects: s.subjects.filter(sub => sub.id !== id) }));
+    } catch (e: any) { console.error("Error deleting subject"); }
   },
 
+  // --- CLASSES ---
   addClass: async (c) => {
     try {
       const res = await fetch(`${API_BASE}/classes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
@@ -104,11 +146,14 @@ export const useTimetableStore = create<TimetableStore>((set) => ({
     } catch (e: any) { alert("Network Error"); }
   },
   
-  removeClass: async (id) => {
-    await fetch(`${API_BASE}/classes/${id}`, { method: 'DELETE' });
-    set((s) => ({ classes: s.classes.filter(c => c.id !== id) }));
+  deleteClass: async (id) => {
+    try {
+      await fetch(`${API_BASE}/classes/${id}`, { method: 'DELETE' });
+      set((s) => ({ classes: s.classes.filter(c => c.id !== id) }));
+    } catch (e: any) { console.error("Error deleting class"); }
   },
 
+  // --- ROOMS ---
   addRoom: async (r) => {
     try {
       const res = await fetch(`${API_BASE}/rooms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r) });
@@ -116,11 +161,14 @@ export const useTimetableStore = create<TimetableStore>((set) => ({
     } catch (e: any) { alert("Network Error"); }
   },
   
-  removeRoom: async (id) => {
-    await fetch(`${API_BASE}/rooms/${id}`, { method: 'DELETE' });
-    set((s) => ({ rooms: s.rooms.filter(r => r.id !== id) }));
+  deleteRoom: async (id) => {
+    try {
+      await fetch(`${API_BASE}/rooms/${id}`, { method: 'DELETE' });
+      set((s) => ({ rooms: s.rooms.filter(r => r.id !== id) }));
+    } catch (e: any) { console.error("Error deleting room"); }
   },
 
+  // --- UI STATE ---
   setTimetableEntries: (entries) => set({ timetableEntries: entries, isGenerated: true }),
   setIsGenerated: (v) => set({ isGenerated: v }),
   setSelectedClass: (id) => set({ selectedClass: id }),

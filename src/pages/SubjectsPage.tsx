@@ -1,132 +1,235 @@
-import { AppLayout } from '@/components/AppLayout';
+import React, { useState } from 'react';
+import { AppSidebar } from '@/components/AppSidebar';
 import { useTimetableStore } from '@/store/timetableStore';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import type { Subject, SubjectType } from '@/types/timetable';
-import { SUBJECT_COLORS } from '@/types/timetable';
+import { Plus, BookOpen, Trash2, Layers, Edit2 } from 'lucide-react';
 
-const SubjectsPage = () => {
-  const { subjects, addSubject, removeSubject, faculty } = useTimetableStore();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [credits, setCredits] = useState('3');
-  const [type, setType] = useState<SubjectType>('Theory');
-  const [facultyId, setFacultyId] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function SubjectsPage() {
+  const { subjects, classes, faculty, addSubject, deleteSubject, updateSubject } = useTimetableStore(); // NEW: Added updateSubject
+  
+  // 1. THIS IS THE MAGIC: It tracks which section you are currently managing
+  const [activeClassId, setActiveClassId] = useState<string>(classes[0]?.id || '');
+  
+  // Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null); // NEW: Tracks which subject we are editing
 
-  const handleAdd = async () => {
-    if (!name || !code) {
-      toast.error("Subject Name and Code are required");
-      return;
+  const [newSubject, setNewSubject] = useState({
+    name: '',
+    code: '',
+    type: 'Theory',
+    credits: 4,
+    facultyId: ''
+  });
+
+  // Filter the table to ONLY show subjects for the selected section
+  const visibleSubjects = subjects.filter(s => s.classId === activeClassId);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeClassId) return alert("Please select a class first!");
+    
+    if (editingId) {
+      // IF WE ARE EDITING: Update the existing subject
+      updateSubject(editingId, newSubject);
+    } else {
+      // IF WE ARE ADDING NEW: Create a new subject tied to this section
+      addSubject({
+        ...newSubject,
+        id: Math.random().toString(36).substring(7), // Generate temp ID
+        classId: activeClassId 
+      });
     }
+    
+    // Close modal and reset state
+    setIsModalOpen(false);
+    setEditingId(null);
+    setNewSubject({ name: '', code: '', type: 'Theory', credits: 4, facultyId: '' });
+  };
 
-    setIsSubmitting(true);
+  // NEW: Function to open modal in Add Mode
+  const openAddModal = () => {
+    setNewSubject({ name: '', code: '', type: 'Theory', credits: 4, facultyId: '' });
+    setEditingId(null);
+    setIsModalOpen(true);
+  };
 
-    const newSubject: Subject = {
-      id: `s${Date.now()}`,
-      name, 
-      code, 
-      credits: parseInt(credits) || 3, 
-      type,
-      semester: 3, 
-      department: 'CSE', 
-      facultyId: facultyId || undefined,
-      color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length],
-    };
-
-    try {
-      await addSubject(newSubject);
-      toast.success("Subject added successfully!");
-      setName(''); 
-      setCode(''); 
-      setCredits('3'); 
-      setType('Theory'); 
-      setFacultyId('');
-      setOpen(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to save subject. Check your backend server.");
-    } finally {
-      setIsSubmitting(false);
-    }
+  // NEW: Function to open modal in Edit Mode
+  const openEditModal = (sub: any) => {
+    setNewSubject({
+      name: sub.name,
+      code: sub.code || '',
+      type: sub.type,
+      credits: sub.credits,
+      facultyId: sub.facultyId || '' // Keep the assigned teacher selected
+    });
+    setEditingId(sub.id);
+    setIsModalOpen(true);
   };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">Subjects</h1>
-            <p className="text-sm text-muted-foreground">Manage course offerings</p>
+    <div className="flex min-h-screen bg-slate-50">
+      <AppSidebar />
+      
+      <main className="flex-1 ml-64 p-8">
+        <div className="max-w-6xl mx-auto space-y-6">
+          
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Subject Configuration</h2>
+              <p className="text-slate-500 mt-1">Assign subjects and teachers to specific sections</p>
+            </div>
+            
+            <button 
+              onClick={openAddModal}
+              disabled={!activeClassId}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus size={20} /> Add Subject to Section
+            </button>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-accent text-accent-foreground border-0"><Plus className="mr-2 h-4 w-4" />Add Subject</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle className="font-display">Add Subject</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div><Label>Subject Name</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Data Structures" /></div>
-                <div><Label>Code</Label><Input value={code} onChange={e => setCode(e.target.value)} placeholder="CS301" /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div><Label>Credits</Label><Input type="number" value={credits} onChange={e => setCredits(e.target.value)} min={1} max={6} /></div>
-                  <div>
-                    <Label>Type</Label>
-                    <Select value={type} onValueChange={(v) => setType(v as SubjectType)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Theory">Theory</SelectItem>
-                        <SelectItem value="Lab">Lab</SelectItem>
-                        <SelectItem value="Project">Project</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+
+          {/* 3. THE SECTION SELECTOR */}
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
+            <div className="bg-blue-100 p-3 rounded-xl text-blue-600">
+              <Layers size={24} />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+                Currently Managing
+              </label>
+              <select 
+                value={activeClassId} 
+                onChange={(e) => setActiveClassId(e.target.value)}
+                className="w-full max-w-md bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-bold"
+              >
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    Semester {c.semester} — Section {c.sectionName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* THE FILTERED TABLE */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  <th className="px-6 py-4">Subject Name</th>
+                  <th className="px-6 py-4">Type</th>
+                  <th className="px-6 py-4">Credits/Hrs</th>
+                  <th className="px-6 py-4">Assigned Teacher</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {visibleSubjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                      No subjects added for this section yet.
+                    </td>
+                  </tr>
+                ) : (
+                  visibleSubjects.map((subject) => {
+                    const assignedFaculty = faculty.find(f => f.id === subject.facultyId);
+                    return (
+                      <tr key={subject.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900">{subject.name}</p>
+                          <p className="text-xs text-slate-400">{subject.code}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
+                            subject.type.toLowerCase() === 'lab' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {subject.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-700">{subject.credits} hrs</td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-slate-800">{assignedFaculty?.name || 'Unassigned'}</p>
+                          <p className="text-xs text-slate-400">{assignedFaculty?.shortCode || assignedFaculty?.code}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {/* NEW: Edit Button */}
+                          <button onClick={() => openEditModal(subject)} className="text-blue-500 hover:text-blue-700 p-2 hover:bg-blue-50 rounded-lg transition-colors mr-2">
+                            <Edit2 size={18} />
+                          </button>
+                          {/* Delete Button */}
+                          <button onClick={() => deleteSubject(subject.id)} className="text-rose-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      {/* ADD/EDIT SUBJECT MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900 mb-6">
+              {editingId ? "Edit Subject" : "Add Subject to Section"}
+            </h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Subject Name</label>
+                  <input required type="text" placeholder="e.g. Database Management" className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500"
+                    value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} />
+                </div>
+                
+                {/* NEW: Added the missing Subject Code field! */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Subject Code</label>
+                  <input required type="text" placeholder="e.g. CS301" className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500 uppercase font-mono"
+                    value={newSubject.code} onChange={e => setNewSubject({...newSubject, code: e.target.value.toUpperCase()})} />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Type</label>
+                  <select className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500"
+                    value={newSubject.type} onChange={e => setNewSubject({...newSubject, type: e.target.value})}>
+                    <option value="Theory">Theory</option>
+                    <option value="Lab">Lab</option>
+                  </select>
                 </div>
                 <div>
-                  <Label>Assigned Faculty</Label>
-                  <Select value={facultyId} onValueChange={setFacultyId}>
-                    <SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger>
-                    <SelectContent>
-                      {faculty.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Credits (Hours)</label>
+                  <input required type="number" min="1" max="10" className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500"
+                    value={newSubject.credits} onChange={e => setNewSubject({...newSubject, credits: parseInt(e.target.value)})} />
                 </div>
-                <Button onClick={handleAdd} disabled={isSubmitting} className="w-full gradient-accent text-accent-foreground border-0">
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Add Subject'}
-                </Button>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((s) => (
-            <div key={s.id} className="glass-card rounded-xl p-4 animate-fade-in">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                  <div>
-                    <p className="font-semibold text-foreground">{s.name}</p>
-                    <p className="text-xs text-muted-foreground">{s.code} · {s.credits} cr · {s.type}</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => removeSubject(s.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Assign Faculty</label>
+                <select required className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500"
+                  value={newSubject.facultyId} onChange={e => setNewSubject({...newSubject, facultyId: e.target.value})}>
+                  <option value="">Select a Teacher...</option>
+                  {faculty.map(f => (
+                    <option key={f.id} value={f.id}>{f.name} ({f.shortCode || f.code})</option>
+                  ))}
+                </select>
               </div>
-            </div>
-          ))}
+
+              <div className="flex gap-3 mt-8">
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 transition-colors">
+                  {editingId ? "Save Changes" : "Save Subject"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
-    </AppLayout>
+      )}
+    </div>
   );
-};
-
-export default SubjectsPage;
+}

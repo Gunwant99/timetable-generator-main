@@ -1,94 +1,156 @@
-import { AppLayout } from '@/components/AppLayout';
+import React, { useState } from 'react';
+import { AppSidebar } from '@/components/AppSidebar';
 import { useTimetableStore } from '@/store/timetableStore';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import type { ClassSection } from '@/types/timetable';
+import { Plus, GraduationCap, Trash2, Info } from 'lucide-react';
 
-const ClassesPage = () => {
-  const { classes, addClass, removeClass } = useTimetableStore();
-  const [open, setOpen] = useState(false);
-  const [sectionName, setSectionName] = useState('');
-  const [strength, setStrength] = useState('60');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function ClassesPage() {
+  const { classes, addClass, deleteClass } = useTimetableStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [newClass, setNewClass] = useState({
+    semester: 4,
+    sectionName: 'A',
+    department: 'Computer Engineering'
+  });
 
-  const handleAdd = async () => {
-    if (!sectionName) {
-      toast.error("Please enter a section name");
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    const newClass: ClassSection = {
-      id: `c${Date.now()}`,
-      sectionName, 
-      semester: 3, 
-      department: 'CSE',
-      studentStrength: parseInt(strength) || 60,
-    };
-
-    try {
-      await addClass(newClass);
-      toast.success("Class added successfully!");
-      setSectionName(''); 
-      setStrength('60');
-      setOpen(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to save class to the database.");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addClass({
+      ...newClass,
+      id: Math.random().toString(36).substring(7),
+    });
+    setIsModalOpen(false);
+    setNewClass({ semester: 4, sectionName: 'A', department: 'Computer Engineering' });
   };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">Classes & Sections</h1>
-            <p className="text-sm text-muted-foreground">Manage student sections</p>
-          </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-accent text-accent-foreground border-0"><Plus className="mr-2 h-4 w-4" />Add Class</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle className="font-display">Add Class Section</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div><Label>Section Name</Label><Input value={sectionName} onChange={e => setSectionName(e.target.value)} placeholder="CSE-C" /></div>
-                <div><Label>Student Strength</Label><Input type="number" value={strength} onChange={e => setStrength(e.target.value)} /></div>
-                <Button onClick={handleAdd} disabled={isSubmitting} className="w-full gradient-accent text-accent-foreground border-0">
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Add Class'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {classes.map((c) => (
-            <div key={c.id} className="glass-card rounded-xl p-4 animate-fade-in">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-foreground">{c.sectionName}</p>
-                  <p className="text-xs text-muted-foreground">Sem {c.semester} · {c.studentStrength} students</p>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => removeClass(c.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+    <div className="flex min-h-screen bg-slate-50">
+      <AppSidebar />
+      
+      <main className="flex-1 ml-64 p-8">
+        <div className="max-w-5xl mx-auto space-y-6">
+          
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Class Sections</h2>
+              <p className="text-slate-500 mt-1">Manage all active semesters and their sub-sections</p>
             </div>
-          ))}
-        </div>
-      </div>
-    </AppLayout>
-  );
-};
+            
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all"
+            >
+              <Plus size={20} /> Add Section
+            </button>
+          </div>
 
-export default ClassesPage;
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-start gap-3 mb-6">
+            <Info className="text-blue-600 mt-0.5" size={20} />
+            <div>
+              <p className="text-sm font-bold text-blue-800">Section Management</p>
+              <p className="text-xs text-blue-700 mt-1">
+                Each section added here will get its own unique, conflict-free timetable during generation. Ensure you add all sections (e.g., 4A, 4B) before adding subjects.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  <th className="px-6 py-4">Semester</th>
+                  <th className="px-6 py-4">Section</th>
+                  <th className="px-6 py-4">Department</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {classes.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium">
+                      No sections configured yet.
+                    </td>
+                  </tr>
+                ) : (
+                  classes.map((cls) => (
+                    <tr key={cls.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-slate-900">
+                        Semester {cls.semester}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
+                          Section {cls.sectionName}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-600">{cls.department}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => deleteClass(cls.id)} className="text-rose-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors">
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      {/* ADD CLASS MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <GraduationCap className="text-emerald-500" /> Add New Section
+            </h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Semester</label>
+                  <select 
+                    className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500 font-medium"
+                    value={newClass.semester} 
+                    onChange={e => setNewClass({...newClass, semester: parseInt(e.target.value)})}
+                  >
+                    {[1,2,3,4,5,6,7,8].map(num => (
+                      <option key={num} value={num}>Semester {num}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Section</label>
+                  <select 
+                    className="w-full border border-slate-200 rounded-lg p-2.5 outline-none focus:border-emerald-500 font-medium"
+                    value={newClass.sectionName} 
+                    onChange={e => setNewClass({...newClass, sectionName: e.target.value})}
+                  >
+                    {['A', 'B', 'C', 'D'].map(char => (
+                      <option key={char} value={char}>Section {char}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Department</label>
+                <input 
+                  type="text" 
+                  disabled
+                  value={newClass.department} 
+                  className="w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50 text-slate-500 font-medium cursor-not-allowed"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 transition-colors">Save Section</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

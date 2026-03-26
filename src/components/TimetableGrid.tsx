@@ -28,33 +28,55 @@ export function TimetableGrid() {
           <thead>
             <tr className="gradient-primary">
               <th className="px-3 py-3 text-left text-xs font-semibold text-primary-foreground border-r border-primary-foreground/10 w-24">
-                Time
+                Day / Time
               </th>
-              {DAYS.map((day) => (
-                <th key={day} className="px-3 py-3 text-center text-xs font-semibold text-primary-foreground border-r border-primary-foreground/10 last:border-r-0">
-                  {day}
+              {DEFAULT_TIME_SLOTS.map((slot, index) => (
+                <th key={`header-${index}`} className="px-3 py-3 text-center text-xs font-semibold text-primary-foreground border-r border-primary-foreground/10 last:border-r-0 whitespace-nowrap">
+                  {slot.label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {DEFAULT_TIME_SLOTS.map((slot) => (
-              <tr key={slot.index} className={cn(slot.isBreak && 'slot-break')}>
-                <td className="px-3 py-2 text-xs font-medium text-muted-foreground border-r border-border whitespace-nowrap">
-                  {slot.label}
+            {/* Added dayIndex so we know which row is the very first one */}
+            {DAYS.map((day, dayIndex) => (
+              <tr key={day} className="border-b border-border last:border-b-0">
+                <td className="px-3 py-4 text-xs font-bold text-muted-foreground border-r border-border bg-muted/10 whitespace-nowrap">
+                  {day}
                 </td>
-                {DAYS.map((day) => {
+                
+                {DEFAULT_TIME_SLOTS.map((slot, index) => {
+                  
+                  // --- NEW VERTICAL BREAK/LUNCH LOGIC ---
                   if (slot.isBreak) {
-                    return (
-                      <td key={day} className="px-2 py-2 text-center text-xs text-muted-foreground border-r border-border last:border-r-0">
-                        {slot.label}
-                      </td>
-                    );
+                    // If it is Monday (row 0), draw a massive cell that stretches down 6 rows
+                    if (dayIndex === 0) {
+                      return (
+                        <td 
+                          key={`break-${day}-${index}`} 
+                          rowSpan={DAYS.length} 
+                          className="px-2 py-2 text-center align-middle bg-muted/5 border-r border-border last:border-r-0"
+                        >
+                          <div className="flex items-center justify-center h-full">
+                            <span 
+                              className="text-muted-foreground/40 font-bold uppercase tracking-[0.5em] text-sm"
+                              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                            >
+                              {slot.label}
+                            </span>
+                          </div>
+                        </td>
+                      );
+                    }
+                    // For Tuesday through Saturday, don't draw anything here because Monday's cell is covering it!
+                    return null;
                   }
+                  // ---------------------------------------
 
                   const entry = classEntries.find(e => e.day === day && e.slotIndex === slot.index);
+                  
                   if (!entry) {
-                    return <td key={day} className="px-2 py-2 border-r border-border last:border-r-0" />;
+                    return <td key={`empty-${day}-${index}`} className="px-2 py-2 border-r border-border last:border-r-0 min-w-[140px]" />;
                   }
 
                   const sub = subjects.find(s => s.id === entry.subjectId);
@@ -62,10 +84,10 @@ export function TimetableGrid() {
                   const room = rooms.find(r => r.id === entry.roomId);
 
                   return (
-                    <td key={day} className="px-1.5 py-1.5 border-r border-border last:border-r-0">
+                    <td key={`entry-${day}-${index}`} className="px-1.5 py-1.5 border-r border-border last:border-r-0 min-w-[140px]">
                       <div
                         className={cn(
-                          'rounded-lg px-2 py-1.5 text-xs border transition-all hover:scale-[1.02]',
+                          'rounded-lg px-2 py-2 text-xs border transition-all hover:scale-[1.02] h-full min-h-[70px] flex flex-col justify-center',
                           entry.isLab ? 'slot-lab' : 'slot-theory'
                         )}
                         style={sub?.color ? {
@@ -74,7 +96,7 @@ export function TimetableGrid() {
                           color: sub.color,
                         } : undefined}
                       >
-                        <p className="font-semibold truncate">{sub?.code || 'N/A'}</p>
+                        <p className="font-semibold truncate mb-1">{sub?.name || 'N/A'}</p>
                         <p className="truncate opacity-80">{fac?.shortCode}</p>
                         <p className="truncate opacity-60">{room?.roomNumber}</p>
                       </div>
