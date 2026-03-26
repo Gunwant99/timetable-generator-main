@@ -259,15 +259,20 @@ def generate_timetable():
         rooms = Room.query.all()
         all_classes = ClassSection.query.all()
 
+        # 🚨 SAFETY CHECK 1: Ensure we have the minimum required data
+        if not rooms:
+            return jsonify({"success": False, "error": "No rooms found. Please add at least one room."}), 400
+        if not all_classes:
+            return jsonify({"success": False, "error": "No classes found. Please add at least one class."}), 400
+        if not subjects:
+            return jsonify({"success": False, "error": "No subjects found. Please add subjects to your classes."}), 400
+
         # Clear old timetable
         TimetableEntry.query.delete()
         db.session.commit()
 
         faculty_busy = {}
-
         DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-
-        # 🔥 IMPORTANT FIX
         SLOTS_PER_DAY = 8
         BREAK_SLOTS = [2]   # Break column
         LUNCH_SLOTS = [5]   # Lunch column
@@ -288,6 +293,10 @@ def generate_timetable():
         for cls in all_classes:
             cls_subjects = [s for s in subjects if s.class_id == cls.id]
 
+            # 🚨 SAFETY CHECK 2: Skip this class if it has no subjects assigned to it!
+            if not cls_subjects:
+                continue
+
             placed_credits = {s.id: 0 for s in cls_subjects}
             subject_daily_count = {}
 
@@ -296,11 +305,9 @@ def generate_timetable():
 
             for day in DAYS:
                 subject_daily_count[day] = {}
-
                 slot = 0
+                
                 while slot < SLOTS_PER_DAY:
-
-                    # ⛔ SKIP BREAK & LUNCH
                     if slot in BREAK_SLOTS or slot in LUNCH_SLOTS:
                         slot += 1
                         continue
@@ -309,101 +316,78 @@ def generate_timetable():
 
                     # 🔷 TRY LAB (2 slots)
                     if slot < SLOTS_PER_DAY - 1 and (slot + 1) not in BREAK_SLOTS and (slot + 1) not in LUNCH_SLOTS:
-                        random.shuffle(labs)
+                        if labs: # Make sure labs list isn't empty before shuffling
+                            random.shuffle(labs)
+                            for sub in labs:
+                                if placed_credits[sub.id] >= sub.credits:
+                                    continue
+                                count_today = subject_daily_count[day].get(sub.id, 0)
+                                if count_today >= 2:
+                                    continue
 
-                        for sub in labs:
-                            if placed_credits[sub.id] >= sub.credits:
-                                continue
+                                fac = faculties.get(sub.faculty_id)
+                                k1 = get_k(day, slot)
+                                k2 = get_k(day, slot + 1)
 
-                            count_today = subject_daily_count[day].get(sub.id, 0)
-                            if count_today >= 2:
-                                continue
+                                if fac and (k1 in faculty_busy.get(fac.id, set()) or k2 in faculty_busy.get(fac.id, set())):
+                                    continue
 
-                            fac = faculties.get(sub.faculty_id)
-                            k1 = get_k(day, slot)
-                            k2 = get_k(day, slot + 1)
+                                room = random.choice(lab_rooms)
+                                for s in [slot, slot + 1]:
+                                    db.session.add(TimetableEntry(
+                                        day=day, slot_index=s, subject_id=sub.id, faculty_id=fac.id if fac else None,
+                                        room_id=room.id, class_id=cls.id, is_lab=True
+                                    ))
+                                    if fac:
+                                        faculty_busy.setdefault(fac.id, set()).add(get_k(day, s))
 
-                            if fac and (k1 in faculty_busy.get(fac.id, set()) or k2 in faculty_busy.get(fac.id, set())):
-                                continue
-
-                            room = random.choice(lab_rooms)
-
-                            for s in [slot, slot + 1]:
-                                db.session.add(TimetableEntry(
-                                    day=day,
-                                    slot_index=s,
-                                    subject_id=sub.id,
-                                    faculty_id=fac.id if fac else None,
-                                    room_id=room.id,
-                                    class_id=cls.id,
-                                    is_lab=True
-                                ))
-
-                                if fac:
-                                    faculty_busy.setdefault(fac.id, set()).add(get_k(day, s))
-
-                            placed_credits[sub.id] += 2
-                            subject_daily_count[day][sub.id] = count_today + 2
-
-                            slot += 2
-                            assigned = True
-                            break
+                                placed_credits[sub.id] += 2
+                                subject_daily_count[day][sub.id] = count_today + 2
+                                slot += 2
+                                assigned = True
+                                break
 
                     if assigned:
                         continue
 
                     # 🔷 TRY THEORY (1 slot)
-                    random.shuffle(theories)
+                    if theories: # Make sure theories list isn't empty before shuffling
+                        random.shuffle(theories)
+                        for sub in theories:
+                            if placed_credits[sub.id] >= sub.credits:
+                                continue
+                            count_today = subject_daily_count[day].get(sub.id, 0)
+                            if count_today >= 2:
+                                continue
 
-                    for sub in theories:
-                        if placed_credits[sub.id] >= sub.credits:
-                            continue
+                            fac = faculties.get(sub.faculty_id)
+                            k = get_k(day, slot)
 
-                        count_today = subject_daily_count[day].get(sub.id, 0)
-                        if count_today >= 2:
-                            continue
+                            if fac and k in faculty_busy.get(fac.id, set()):
+                                continue
 
-                        fac = faculties.get(sub.faculty_id)
-                        k = get_k(day, slot)
+                            room = random.choice(class_rooms)
+                            db.session.add(TimetableEntry(
+                                day=day, slot_index=slot, subject_id=sub.id, faculty_id=fac.id if fac else None,
+                                room_id=room.id, class_id=cls.id, is_lab=False
+                            ))
+                            if fac:
+                                faculty_busy.setdefault(fac.id, set()).add(k)
 
-                        if fac and k in faculty_busy.get(fac.id, set()):
-                            continue
-
-                        room = random.choice(class_rooms)
-
-                        db.session.add(TimetableEntry(
-                            day=day,
-                            slot_index=slot,
-                            subject_id=sub.id,
-                            faculty_id=fac.id if fac else None,
-                            room_id=room.id,
-                            class_id=cls.id,
-                            is_lab=False
-                        ))
-
-                        if fac:
-                            faculty_busy.setdefault(fac.id, set()).add(k)
-
-                        placed_credits[sub.id] += 1
-                        subject_daily_count[day][sub.id] = count_today + 1
-
-                        assigned = True
-                        break
+                            placed_credits[sub.id] += 1
+                            subject_daily_count[day][sub.id] = count_today + 1
+                            assigned = True
+                            break
 
                     # 🔥 FINAL FALLBACK (NO EMPTY SLOT)
-                    if not assigned:
+                    if not assigned and cls_subjects: # Ensure cls_subjects isn't empty!
                         sub = random.choice(cls_subjects)
                         fac = faculties.get(sub.faculty_id)
                         room = random.choice(class_rooms)
 
                         db.session.add(TimetableEntry(
-                            day=day,
-                            slot_index=slot,
-                            subject_id=sub.id,
-                            faculty_id=fac.id if fac else None,
-                            room_id=room.id,
-                            class_id=cls.id,
-                            is_lab=False
+                            day=day, slot_index=slot, subject_id=sub.id, faculty_id=fac.id if fac else None,
+                            room_id=room.id, class_id=cls.id, is_lab=False
                         ))
 
                     slot += 1
@@ -413,7 +397,7 @@ def generate_timetable():
 
     except Exception as e:
         db.session.rollback()
-        print(f"ERROR: {e}")
+        print(f"ERROR in generate: {e}") # This will print to your Python terminal!
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
