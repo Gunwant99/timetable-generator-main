@@ -101,7 +101,7 @@ const TimetablePage = () => {
             <Select value={selectedClass || ''} onValueChange={setSelectedClass}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Select Section" /></SelectTrigger>
               <SelectContent>
-                {classes.map((c) => (<SelectItem key={c.id} value={c.id}>{c.sectionName}</SelectItem>))}
+                {classes.map((c) => (<SelectItem key={c.id} value={c.id}>{c.displayName}</SelectItem>))}
               </SelectContent>
             </Select>
 
