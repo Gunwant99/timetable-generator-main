@@ -101,12 +101,17 @@ def manage_subjects():
 @app.route('/api/classes', methods=['GET', 'POST'])
 def manage_classes():
     if request.method == 'GET':
-        return jsonify([{'id': c.id, 'sectionName': c.section_name, 'semester': c.semester, 'department': c.department, 'studentStrength': c.student_strength} for c in ClassSection.query.all()])
-    data = request.json
-    # Fix for missing student strength
-    db.session.add(ClassSection(id=data['id'], section_name=data['sectionName'], semester=data['semester'], department=data['department'], student_strength=data.get('studentStrength', 60)))
-    db.session.commit()
-    return jsonify({"m": "ok"}), 201
+        # Added .order_by so the list stays organized by semester
+        all_cls = ClassSection.query.order_by(ClassSection.semester, ClassSection.section_name).all()
+        return jsonify([{
+            'id': c.id, 
+            'sectionName': c.section_name, 
+            'semester': c.semester, 
+            # ✨ This creates the label "6th Sem - B"
+            'displayName': f"{c.semester}th Sem - {c.section_name}",
+            'department': c.department, 
+            'studentStrength': c.student_strength
+        } for c in all_cls])
 
 @app.route('/api/rooms', methods=['GET', 'POST'])
 def manage_rooms():
